@@ -24,9 +24,10 @@
 start:
                 sei
                 jsr rc4_init
+                jsr rc4_dump_state
                 inc $d020
 
-                jsr rc4_update
+//                jsr rc4_update
                 dec $d020
                 cli
                 rts
@@ -37,15 +38,43 @@ start:
 // Initialize the rc4 state based on the given key.
 //------------------------------------------------------------------
 rc4_init:
-                lda #$00
-l1:             tax
+                // Set initial state.
+                ldx #$00
+init1:          txa
                 sta state, x
                 inx
-                bne l1
+                bne init1
 
                 lda #$00
                 sta i_ptr
                 sta j_ptr
+
+                // Update j pointer using key material and state.
+init2:          lda i_ptr
+                and #$0f
+                tay
+                lda key, y
+                clc
+                adc j_ptr
+                sta j_ptr
+                ldx i_ptr
+                lda state, x
+                clc
+                adc j_ptr
+                sta j_ptr
+
+                // Swap state bytes.
+                ldx i_ptr
+                lda state, x
+                sta i_tmp
+                ldy j_ptr
+                lda state, y
+                sta state, x
+                lda i_tmp
+                sta state, y
+
+                inc i_ptr
+                bne init2
                 rts
 
 
@@ -56,6 +85,16 @@ l1:             tax
 rc4_update:
                 rts
 
+
+//------------------------------------------------------------------
+//------------------------------------------------------------------
+rc4_dump_state:
+                ldx #$00
+ds1:            lda state,x
+                sta $0400,x
+                dex
+                bne ds1
+                rts
 
 //------------------------------------------------------------------
 // AES S-Box.
@@ -86,7 +125,19 @@ key:
 i_ptr:
 .byte $00
 
+i_tmp:
+.byte $00
+
 j_ptr:
+.byte $00
+
+j_tmp:
+.byte $00
+
+k_ptr:
+.byte $00
+
+k_tmp:
 .byte $00
 
 tmp:
