@@ -75,6 +75,11 @@ init2:          lda i_ptr
 
                 inc i_ptr
                 bne init2
+
+                lda #$00
+                sta i_ptr
+                sta j_ptr
+
                 rts
 
 
@@ -83,6 +88,37 @@ init2:          lda i_ptr
 // Update the rc4 state one step.
 //------------------------------------------------------------------
 rc4_update:
+
+                // Update pointers.
+                inc i_ptr
+                ldx i_ptr
+                lda state, x
+                clc
+                adc j_ptr
+                sta j_ptr
+
+                // Swap elements.
+                ldx i_ptr
+                lda state, x
+                sta i_tmp
+                ldx j_ptr
+                lda state, x
+                sta j_tmp
+                ldx j_ptr
+                lda i_tmp
+                sta state, x
+                ldx i_ptr
+                lda i_tmp
+                sta state, x
+
+                // Get k pointer from state and extract keystream byte.
+                lda i_tmp
+                clc
+                adc j_tmp
+                txa
+                lda state, x
+                sta keystream_byte
+
                 rts
 
 
@@ -134,15 +170,10 @@ j_ptr:
 j_tmp:
 .byte $00
 
-k_ptr:
+keystream_byte:
 .byte $00
 
-k_tmp:
-.byte $00
-
-tmp:
-.byte $00, $00
 
 //======================================================================
-// aes.a65
+// rc4.a65
 //======================================================================
