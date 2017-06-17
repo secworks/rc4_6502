@@ -27,7 +27,7 @@ start:
                 jsr rc4_dump_state
                 inc $d020
 
-//                jsr rc4_update
+                jsr rc4_update
                 dec $d020
                 cli
                 rts
