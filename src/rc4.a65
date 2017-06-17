@@ -22,14 +22,21 @@
 // Main program implements a few tests by calling the AES code
 .pc = $1000     "Main code"
 start:
-                sei
                 jsr rc4_init
                 jsr rc4_dump_state
                 inc $d020
 
+key_scan:
+                jsr $ffe4
+                beq key_scan
+                cmp #$0d
+                beq done
                 jsr rc4_update
+                jsr rc4_dump_state
                 dec $d020
-                cli
+                jmp key_scan
+done: 
+
                 rts
 
 
