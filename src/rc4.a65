@@ -11,6 +11,35 @@
 //======================================================================
 
 //------------------------------------------------------------------
+// Labels
+//------------------------------------------------------------------
+// keylen in bytes. Must be 16, 32.
+.label keylen = 16
+
+
+//------------------------------------------------------------------
+// Macros.
+//------------------------------------------------------------------
+.macro save_regs()
+{
+                pha
+                txa
+                pha
+                tay
+                pha
+}
+
+.macro restore_regs()
+{
+                pla
+                tay
+                pla
+                tax
+                pla
+}
+
+
+//------------------------------------------------------------------
 // Basic start code.
 //------------------------------------------------------------------
 .pc = $0801     "Basic uppstart"
@@ -18,13 +47,15 @@
 
 
 //------------------------------------------------------------------
+// start
+// Simmple program that shows how the rc4 cipher init and update
+// routines can be used to enchipher or decipher an area based
+// on a given key.
 //------------------------------------------------------------------
-// Main program implements a few tests by calling the AES code
-.pc = $1000     "Main code"
+.pc = $1000     "RC4 example program"
 start:
                 jsr rc4_init
                 jsr rc4_dump_state
-                inc $d020
 
 key_scan:
                 jsr $ffe4
@@ -45,6 +76,7 @@ done:
 // Initialize the rc4 state based on the given key.
 //------------------------------------------------------------------
 rc4_init:
+                save_regs:
                 // Set initial state.
                 ldx #$00
 init1:          txa
@@ -58,7 +90,7 @@ init1:          txa
 
                 // Update j pointer using key material and state.
 init2:          lda i_ptr
-                and #$0f
+                and (keylen - 1)
                 tay
                 lda key, y
                 clc
@@ -87,14 +119,16 @@ init2:          lda i_ptr
                 sta i_ptr
                 sta j_ptr
 
+                restore_regs:
                 rts
 
 
 //------------------------------------------------------------------
 // rc4_update
-// Update the rc4 state one step.
+// Update the rc4 state and generate the next keystream byte.
 //------------------------------------------------------------------
 rc4_update:
+                save_regs:
 
                 // Update pointers.
                 inc i_ptr
@@ -126,10 +160,12 @@ rc4_update:
                 lda state, x
                 sta keystream_byte
 
+                restore_regs:
                 rts
 
 
 //------------------------------------------------------------------
+// Support routines for debug and test.
 //------------------------------------------------------------------
 rc4_dump_state:
                 ldx #$00
