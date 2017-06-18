@@ -22,20 +22,12 @@
 //------------------------------------------------------------------
 .macro save_regs()
 {
-                pha
-                txa
-                pha
-                tya
-                pha
+                stx x_tmp
 }
 
 .macro restore_regs()
 {
-                pla
-                tay
-                pla
-                tax
-                pla
+                ldx x_tmp
 }
 
 
@@ -51,11 +43,20 @@
 // Simmple program that shows how the rc4 cipher init and update
 // routines can be used to enchipher or decipher an area based
 // on a given key.
+//
+// The program calls rc4_init with the given key in the key table.
+// The program then repeatedly calls rc4_update to get new keystream
+// bytes.
+//
+// The keystream byte should be used to XOR the bytes in the
+// data to be encrypted, decrypted.
 //------------------------------------------------------------------
 .pc = $1000     "RC4 example program"
 start:
                 jsr rc4_init
                 jsr rc4_dump_state
+                lda #$00
+                sta $f8
 
 key_scan:
                 jsr $ffe4
@@ -63,11 +64,14 @@ key_scan:
                 cmp #$0d
                 beq done
                 jsr rc4_update
+                lda keystream_byte
+                ldx $f8
+                sta $0600, x
+                inc $f8
                 jsr rc4_dump_state
                 dec $d020
                 jmp key_scan
 done: 
-
                 rts
 
 
@@ -77,40 +81,43 @@ done:
 //------------------------------------------------------------------
 rc4_init:
                 :save_regs()
-                // Set initial state.
+
+                // Set initial state to identity array.
                 ldx #$00
 init1:          txa
                 sta state, x
                 inx
                 bne init1
 
+
+                // Loop over all positions using the i and j pointers.
+                // Update j pointer using key material and state.
                 lda #$00
                 sta i_ptr
                 sta j_ptr
 
-                // Update j pointer using key material and state.
 init2:          lda i_ptr
                 and #(keylen - 1)
-                tay
-                lda key, y
+                tax
+                lda key, x
                 clc
                 adc j_ptr
-                sta j_ptr
                 ldx i_ptr
-                lda state, x
                 clc
-                adc j_ptr
+                adc state, x
                 sta j_ptr
 
                 // Swap state bytes.
                 ldx i_ptr
                 lda state, x
                 sta i_tmp
-                ldy j_ptr
-                lda state, y
+                ldx j_ptr
+                lda state, x
+                ldx i_ptr
                 sta state, x
+                ldx j_ptr
                 lda i_tmp
-                sta state, y
+                sta state, x
 
                 inc i_ptr
                 bne init2
@@ -118,6 +125,7 @@ init2:          lda i_ptr
                 lda #$00
                 sta i_ptr
                 sta j_ptr
+                sta keystream_byte
 
                 :restore_regs()
                 rts
@@ -134,29 +142,25 @@ rc4_update:
                 inc i_ptr
                 ldx i_ptr
                 lda state, x
+                sta i_tmp
                 clc
                 adc j_ptr
                 sta j_ptr
 
-                // Swap elements.
-                ldx i_ptr
-                lda state, x
-                sta i_tmp
-                ldx j_ptr
+                // Swap bytes pointed to by i and j.
+                tax
                 lda state, x
                 sta j_tmp
-                ldx j_ptr
                 lda i_tmp
                 sta state, x
                 ldx i_ptr
-                lda i_tmp
+                lda j_tmp
                 sta state, x
 
-                // Calc k pointer from state and extract keystream byte.
-                lda i_tmp
+                // Add byte values and use as index for keystream byte.
                 clc
-                adc j_tmp
-                txa
+                adc i_tmp
+                tax
                 lda state, x
                 sta keystream_byte
 
@@ -182,11 +186,17 @@ ds1:            lda state,x
                 sta $051b
                 lda j_tmp
                 sta $051c
+
+                lda keystream_byte
+                sta $051e
                 rts
 
 //------------------------------------------------------------------
 // State table and variables.
 //------------------------------------------------------------------
+x_tmp:
+.byte $00
+
 i_ptr:
 .byte $00
 
