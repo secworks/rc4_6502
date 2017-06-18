@@ -76,7 +76,7 @@ done:
 // Initialize the rc4 state based on the given key.
 //------------------------------------------------------------------
 rc4_init:
-                save_regs:
+                :save_regs()
                 // Set initial state.
                 ldx #$00
 init1:          txa
@@ -90,7 +90,7 @@ init1:          txa
 
                 // Update j pointer using key material and state.
 init2:          lda i_ptr
-                and (keylen - 1)
+                and #(keylen - 1)
                 tay
                 lda key, y
                 clc
@@ -119,7 +119,7 @@ init2:          lda i_ptr
                 sta i_ptr
                 sta j_ptr
 
-                restore_regs:
+                :restore_regs()
                 rts
 
 
@@ -128,7 +128,7 @@ init2:          lda i_ptr
 // Update the rc4 state and generate the next keystream byte.
 //------------------------------------------------------------------
 rc4_update:
-                save_regs:
+                :save_regs()
 
                 // Update pointers.
                 inc i_ptr
@@ -152,7 +152,7 @@ rc4_update:
                 lda i_tmp
                 sta state, x
 
-                // Get k pointer from state and extract keystream byte.
+                // Calc k pointer from state and extract keystream byte.
                 lda i_tmp
                 clc
                 adc j_tmp
@@ -160,7 +160,7 @@ rc4_update:
                 lda state, x
                 sta keystream_byte
 
-                restore_regs:
+                :restore_regs()
                 rts
 
 
