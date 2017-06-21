@@ -16,6 +16,9 @@
 // keylen in bytes. Must be 16, 32.
 .label keylen = 16
 
+.label mem_start = $6000
+.label mem_end = $7532
+
 
 //------------------------------------------------------------------
 // Macros.
@@ -44,15 +47,119 @@
 // routines can be used to enchipher or decipher an area based
 // on a given key.
 //
-// The program calls rc4_init with the given key in the key table.
-// The program then repeatedly calls rc4_update to get new keystream
-// bytes.
 //
 // The keystream byte should be used to XOR the bytes in the
 // data to be encrypted, decrypted.
 //------------------------------------------------------------------
-.pc = $1000     "RC4 example program"
+* = $1000     "RC4 example program"
 start:
+//                jmp interactive
+                jmp encdec
+
+//------------------------------------------------------------------
+// The encdec program perform a secquence of encipher a memory
+// area. Performing a second init and checking the init state.
+// If the init state is correct the memory area is deciphered.
+//------------------------------------------------------------------
+encdec:
+                jsr rc4_init
+                jsr encdec_area
+
+                jsr rc4_init
+                jsr check_state
+                lda state_status
+                bne encdec1
+                jsr encdec_area
+                rts        
+encdec1:
+                jsr error_state
+                rts
+
+
+//------------------------------------------------------------------
+// error_state:
+// Print a very descriptive error message.
+//------------------------------------------------------------------
+error_state:
+                ldx #$00
+err1:
+                lda err_string, x
+                sta $0400, x
+                inx
+                cpx #$05
+                bne err1
+                rts
+
+
+//------------------------------------------------------------------
+// check_state
+// Check four bytes in the rc4 state after init to see if the
+// state has correctly been initalized. This can only happen if
+// the key was correct.
+//------------------------------------------------------------------
+check_state:
+                lda state
+                cmp state_expected
+                bne check1
+
+                lda state + $3f
+                cmp state_expected + 1
+                bne check1
+
+                lda state + $7f
+                cmp state_expected + 2
+                bne check1
+
+                lda state + $ff
+                cmp state_expected + 3
+                bne check1
+
+                lda #$00
+                sta state_status
+                rts
+check1:
+                lda #$01
+                sta state_status
+                rts
+
+
+//------------------------------------------------------------------
+// encdec_area
+// Encipher or decipher the area mem_start..mem_end.
+//------------------------------------------------------------------
+encdec_area:
+                lda #<mem_start
+                sta $f8
+                lda #>mem_start
+                sta $f9
+
+                ldy #$00
+enc2:
+                jsr rc4_update
+                lda ($f8), y
+                eor keystream_byte
+                sta ($f8), y
+                lda $f9
+                cmp #>mem_end
+                beq enc1
+                iny
+                bne enc2
+                inc $f9
+                jmp enc2
+enc1:           iny
+                cpy #<mem_end
+                bne enc2
+                rts
+
+
+//------------------------------------------------------------------
+// The interactive program calls rc4_init with the given key in
+// the key table. The program then repeatedly calls rc4_update to
+// get a new keystream byte every time a key is pressed.
+//
+// Dumps the state, pointers and keystream onto the screen.
+//------------------------------------------------------------------
+interactive:
                 jsr rc4_init
                 jsr rc4_dump_state
                 lda #$00
@@ -71,7 +178,7 @@ key_scan:
                 jsr rc4_dump_state
                 dec $d020
                 jmp key_scan
-done: 
+done:
                 rts
 
 
@@ -194,6 +301,15 @@ ds1:            lda state,x
 //------------------------------------------------------------------
 // State table and variables.
 //------------------------------------------------------------------
+state_expected:
+.byte $01, $9c, $7f, $07
+
+state_status:
+.byte $00
+
+err_string:
+.text "error!"
+
 x_tmp:
 .byte $00
 
